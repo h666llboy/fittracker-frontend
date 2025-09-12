@@ -1,0 +1,25 @@
+.app-dark {
+  background-color: #121212;
+  color: #eee;
+  min-height: 100vh;
+  padding: 2rem;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.ex-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 1.5rem;
+}
+
+.ex-card {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ex-card a {
+  color: #90caf9;
+}
