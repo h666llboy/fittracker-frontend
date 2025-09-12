@@ -1,0 +1,7 @@
+cd C:\Projects\fittracker\frontend
+git init
+git add .
+git commit -m "initial frontend"
+git branch -M main
+git remote add origin https://github.com/YOUR_NAME/fittracker-frontend.git
+git push -u origin main
