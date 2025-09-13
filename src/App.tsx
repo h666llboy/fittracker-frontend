@@ -73,7 +73,8 @@ function App() {
 
   /* ---------- загрузка данных ---------- */
   useEffect(() => {
-    axios.get<Exercise[]>('http://127.0.0.1:8000/exercises').then(res => setExercises(res.data));
+    const BACKEND_URL = 'https://fittracker-backend-ptcq.onrender.com';
+    axios.get(`${BACKEND_URL}/exercises`).then(res => setExercises(res.data));
     loadHistory();
     loadPrograms();
   }, []);
