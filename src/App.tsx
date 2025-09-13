@@ -80,17 +80,17 @@ function App() {
   }, []);
 
   const loadHistory = async () => {
-    const res = await axios.get<FinishedWorkout[]>('http://127.0.0.1:8000/workouts/history');
+    const res = await axios.get<FinishedWorkout[]>('https://fittracker-backend-ptcq.onrender.com');
     setHistory(res.data);
   };
 
   const loadPrograms = async () => {
-    const res = await axios.get<ShortProgram[]>('http://127.0.0.1:8000/programs');
+    const res = await axios.get<ShortProgram[]>('https://fittracker-backend-ptcq.onrender.com');
     setPrograms(res.data);
   };
 
   const loadProgramExercises = async (id: number) => {
-    const res = await axios.get<WorkoutProgram>(`http://127.0.0.1:8000/programs/${id}`);
+    const res = await axios.get<WorkoutProgram>(`https://fittracker-backend-ptcq.onrender.com${id}`);
     setExercises(res.data.exercises);
     setSelectedId(id);
   };
@@ -282,7 +282,7 @@ function App() {
 
       <button
         onClick={async () => {
-          const res = await axios.get('http://127.0.0.1:8000/export-history', { responseType: 'blob' });
+          const res = await axios.get('https://fittracker-backend-ptcq.onrender.com', { responseType: 'blob' });
           const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
           const a = document.createElement('a');
           a.href = url;
