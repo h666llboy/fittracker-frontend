@@ -5,7 +5,6 @@ import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import './App.css';
 import ImportProgram from './ImportProgram';
-
 /* - типы - */
 type Exercise = {
   id: number;
@@ -16,26 +15,22 @@ type Exercise = {
   reps: number;
   weight: number;
 };
-
 type WorkoutProgram = {
   id: number;
   title: string;
   exercises: Exercise[];
 };
-
 type ShortProgram = {
   id: number;
   title: string;
   ex_count: number;
 };
-
 type FinishedWorkout = {
   id: number;
   finished_at: string;
   duration_sec: number;
   exercises_done: string[];
 };
-
 /* - адрес бэкенда в облаке - */
 const API_URL = 'https://fittracker-backend-ptcq.onrender.com'; // УБРАЛ ПРОБЕЛ В КОНЦЕ!
 
@@ -47,13 +42,11 @@ function App() {
   const [history, setHistory] = useState<FinishedWorkout[]>([]);
   const [isPWA, setIsPWA] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
   const [isActive, setIsActive] = useState<boolean>(false);
   const [soundFile, setSoundFile] = useState<string>('beep.wav');
   const [startTime, setStartTime] = useState<number>(Date.now());
-
   /* - загрузка данных - */
   const loadExercises = async () => {
     try {
@@ -63,7 +56,6 @@ function App() {
       console.error('Ошибка загрузки упражнений:', err);
     }
   };
-
   const loadPrograms = async () => {
     try {
       const res = await axios.get<ShortProgram[]>(`${API_URL}/programs`); // ИСПРАВИЛ АДРЕС
@@ -72,7 +64,6 @@ function App() {
       console.error('Ошибка загрузки программ:', err);
     }
   };
-
   const loadHistory = async () => {
     try {
       const res = await axios.get<FinishedWorkout[]>(`${API_URL}/workouts/history`); // ИСПРАВИЛ АДРЕС
@@ -81,14 +72,12 @@ function App() {
       console.error('Ошибка загрузки истории:', err);
     }
   };
-
   /* - эффекты - */
   useEffect(() => {
     loadExercises();
     loadPrograms();
     loadHistory();
   }, []);
-
   useEffect(() => {
     // Таймер
     let interval: NodeJS.Timeout | null = null;
@@ -105,7 +94,6 @@ function App() {
       if (interval) clearInterval(interval);
     };
   }, [isActive, secondsLeft, soundFile]);
-
   useEffect(() => {
     // PWA
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -118,20 +106,17 @@ function App() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
-
   /* - обработчики - */
   const startTimer = (sec: number) => {
     setSecondsLeft(sec);
     setTotalSeconds(sec);
     setIsActive(true);
   };
-
   const resetTimer = () => {
     setIsActive(false);
     setSecondsLeft(0);
     setTotalSeconds(0);
   };
-
   const saveEdit = async () => {
     if (!editingProg) return;
     try {
@@ -142,7 +127,6 @@ function App() {
       console.error('Ошибка сохранения:', err);
     }
   };
-
   const deleteProgram = async (id: number) => {
     if (!window.confirm('Удалить программу?')) return;
     try {
@@ -152,7 +136,6 @@ function App() {
       console.error('Ошибка удаления:', err);
     }
   };
-
   const finishWorkout = async () => {
     if (!exercises.length) return;
     try {
@@ -169,7 +152,6 @@ function App() {
       console.error('Ошибка завершения:', err);
     }
   };
-
   const exportHistory = async () => {
     try {
       const res = await axios.get(`${API_URL}/export-history`, { // ИСПРАВИЛ АДРЕС
@@ -186,7 +168,6 @@ function App() {
       console.error('Ошибка экспорта:', err);
     }
   };
-
   const installPWA = () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -198,22 +179,18 @@ function App() {
       });
     }
   };
-
   /* - расчёты для круга - */
   const percentage = totalSeconds ? Math.round((secondsLeft / totalSeconds) * 100) : 0;
-
   /* - рендер - */
   return (
     <div className="app-dark">
       <h1>Моя тренировка</h1>
-
       {/* Импорт программ */}
       <ImportProgram onImported={() => {
         loadPrograms();
         loadExercises();
       }} />
       <hr style={{ margin: '1rem 0' }} />
-
       {/* Кнопка установки PWA */}
       {isPWA && (
         <button onClick={installPWA} style={{ 
@@ -227,7 +204,6 @@ function App() {
           📲 Установить приложение
         </button>
       )}
-
       {/* Таймер */}
       <div style={{ width: 150, height: 150, margin: '0 auto 1rem' }}>
         <CircularProgressbar 
@@ -241,7 +217,6 @@ function App() {
           })}
         />
       </div>
-
       {/* Управление таймером */}
       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
         <button onClick={() => startTimer(60)}>60s</button>
@@ -251,7 +226,6 @@ function App() {
         <button onClick={resetTimer} style={{ background: '#f44336' }}>Стоп</button>
         <button onClick={finishWorkout} style={{ background: '#4CAF50' }}>🏁 Завершить</button>
       </div>
-
       {/* Выбор звука */}
       <label style={{ marginBottom: '1rem', display: 'block' }}>
         Звук таймера:
@@ -265,7 +239,6 @@ function App() {
           <option value="voice.wav">Голос</option>
         </select>
       </label>
-
       {/* Список упражнений */}
       <h2>Упражнения</h2>
       <ul style={{ padding: 0 }}>
@@ -293,7 +266,6 @@ function App() {
           </li>
         ))}
       </ul>
-
       {/* Список программ */}
       <h2>Программы тренировок</h2>
       <ul style={{ padding: 0 }}>
@@ -323,7 +295,6 @@ function App() {
           </li>
         ))}
       </ul>
-
       {/* История тренировок */}
       <h2>История тренировок</h2>
       <button onClick={exportHistory} style={{ marginBottom: '1rem' }}>📥 Экспорт в CSV</button>
@@ -342,7 +313,6 @@ function App() {
           </li>
         ))}
       </ul>
-
       {/* Модальное окно редактирования */}
       {editingProg && (
         <dialog open style={{ 
@@ -393,5 +363,4 @@ function App() {
     </div>
   );
 }
-
 export default App;
