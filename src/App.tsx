@@ -6,7 +6,7 @@ import 'react-circular-progressbar/dist/styles.css';
 import './App.css';
 import ImportProgram from './ImportProgram';
 
-/* ---------- типы ---------- */
+/* - типы - */
 type Exercise = {
   id: number;
   name: string;
@@ -36,290 +36,336 @@ type FinishedWorkout = {
   exercises_done: string[];
 };
 
+/* - адрес бэкенда в облаке - */
+const API_URL = 'https://fittracker-backend-ptcq.onrender.com'; // УБРАЛ ПРОБЕЛ В КОНЦЕ!
+
 function App() {
-  /* ---------- состояния ---------- */
+  /* - состояния - */
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [programs, setPrograms] = useState<ShortProgram[]>([]);
+  const [editingProg, setEditingProg] = useState<WorkoutProgram | null>(null);
+  const [history, setHistory] = useState<FinishedWorkout[]>([]);
+  const [isPWA, setIsPWA] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
-  const [startTime, setStartTime] = useState<number>(Date.now());
-  const [history, setHistory] = useState<FinishedWorkout[]>([]);
-  const [programs, setPrograms] = useState<ShortProgram[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [editingProg, setEditingProg] = useState<WorkoutProgram | null>(null);
+  const [isActive, setIsActive] = useState<boolean>(false);
   const [soundFile, setSoundFile] = useState<string>('beep.wav');
+  const [startTime, setStartTime] = useState<number>(Date.now());
 
-  /* ---------- PWA: кнопка «Установить» ---------- */
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const installApp = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') console.log('Пользователь установил приложение');
-      setDeferredPrompt(null);
-    } else {
-      alert('Установка недоступна в этом браузере');
+  /* - загрузка данных - */
+  const loadExercises = async () => {
+    try {
+      const res = await axios.get<Exercise[]>(`${API_URL}/exercises`); // ИСПРАВИЛ АДРЕС
+      setExercises(res.data);
+    } catch (err) {
+      console.error('Ошибка загрузки упражнений:', err);
     }
-  };
-
-  /* ---------- загрузка данных ---------- */
-  useEffect(() => {
-    const BACKEND_URL = 'https://fittracker-backend-ptcq.onrender.com';
-    axios.get(`${BACKEND_URL}/exercises`).then(res => setExercises(res.data));
-    loadHistory();
-    loadPrograms();
-  }, []);
-
-  const loadHistory = async () => {
-    const res = await axios.get<FinishedWorkout[]>('https://fittracker-backend-ptcq.onrender.com');
-    setHistory(res.data);
   };
 
   const loadPrograms = async () => {
-    const res = await axios.get<ShortProgram[]>('https://fittracker-backend-ptcq.onrender.com');
-    setPrograms(res.data);
-  };
-
-  const loadProgramExercises = async (id: number) => {
-    const res = await axios.get<WorkoutProgram>(`https://fittracker-backend-ptcq.onrender.com${id}`);
-    setExercises(res.data.exercises);
-    setSelectedId(id);
-  };
-
-  /* ---------- таймер + выбор звука ---------- */
-  const startTimer = (sec: number) => {
-    setTotalSeconds(sec);
-    setSecondsLeft(sec);
-    setStartTime(Date.now());
-    const end = Date.now() + sec * 1000;
-    const int = setInterval(() => {
-      const left = Math.round((end - Date.now()) / 1000);
-      if (left <= 0) {
-        clearInterval(int);
-        setSecondsLeft(0);
-        beep();
-      } else {
-        setSecondsLeft(left);
-      }
-    }, 1000);
-  };
-
-  const beep = () => {
-    const audio = new Audio(`/sounds/${soundFile}`);
-    audio.play();
-  };
-
-  /* ---------- завершить тренировку ---------- */
-  const finishWorkout = async () => {
-    const duration = Math.round((Date.now() - startTime) / 1000);
-    const names = exercises.map(e => e.name);
-    await axios.post('http://127.0.0.1:8000/workouts/finish', { duration, exercises: names });
-    alert('Тренировка сохранена!');
-    loadHistory();
-  };
-
-  /* ---------- удаление / редактирование ---------- */
-  const deleteProgram = async (id: number) => {
-    if (!window.confirm('Удалить программу?')) return;
-    await axios.delete(`http://127.0.0.1:8000/programs/${id}`);
-    alert('Удалено');
-    loadPrograms();
-    if (selectedId === id) {
-      setSelectedId(null);
-      setExercises([]);
+    try {
+      const res = await axios.get<ShortProgram[]>(`${API_URL}/programs`); // ИСПРАВИЛ АДРЕС
+      setPrograms(res.data);
+    } catch (err) {
+      console.error('Ошибка загрузки программ:', err);
     }
+  };
+
+  const loadHistory = async () => {
+    try {
+      const res = await axios.get<FinishedWorkout[]>(`${API_URL}/workouts/history`); // ИСПРАВИЛ АДРЕС
+      setHistory(res.data);
+    } catch (err) {
+      console.error('Ошибка загрузки истории:', err);
+    }
+  };
+
+  /* - эффекты - */
+  useEffect(() => {
+    loadExercises();
+    loadPrograms();
+    loadHistory();
+  }, []);
+
+  useEffect(() => {
+    // Таймер
+    let interval: NodeJS.Timeout | null = null;
+    if (isActive && secondsLeft > 0) {
+      interval = setInterval(() => {
+        setSecondsLeft(s => s - 1);
+      }, 1000);
+    } else if (isActive && secondsLeft === 0) {
+      setIsActive(false);
+      const audio = new Audio(`/sounds/${soundFile}`);
+      audio.play();
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, secondsLeft, soundFile]);
+
+  useEffect(() => {
+    // PWA
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsPWA(true);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  /* - обработчики - */
+  const startTimer = (sec: number) => {
+    setSecondsLeft(sec);
+    setTotalSeconds(sec);
+    setIsActive(true);
+  };
+
+  const resetTimer = () => {
+    setIsActive(false);
+    setSecondsLeft(0);
+    setTotalSeconds(0);
   };
 
   const saveEdit = async () => {
     if (!editingProg) return;
-    await axios.put(`http://127.0.0.1:8000/programs/${editingProg.id}`, editingProg);
-    alert('Сохранено');
-    setEditingProg(null);
-    loadPrograms();
-    if (selectedId === editingProg.id) setExercises(editingProg.exercises);
+    try {
+      await axios.put(`${API_URL}/programs/${editingProg.id}`, editingProg); // ИСПРАВИЛ АДРЕС
+      setEditingProg(null);
+      loadPrograms();
+    } catch (err) {
+      console.error('Ошибка сохранения:', err);
+    }
   };
 
-  /* ---------- расчёты для круга ---------- */
+  const deleteProgram = async (id: number) => {
+    if (!window.confirm('Удалить программу?')) return;
+    try {
+      await axios.delete(`${API_URL}/programs/${id}`); // ИСПРАВИЛ АДРЕС
+      loadPrograms();
+    } catch (err) {
+      console.error('Ошибка удаления:', err);
+    }
+  };
+
+  const finishWorkout = async () => {
+    if (!exercises.length) return;
+    try {
+      const duration = Math.round((Date.now() - startTime) / 1000);
+      const done = exercises.map(e => e.name);
+      await axios.post(`${API_URL}/workouts/finish`, { // ИСПРАВИЛ АДРЕС
+        finished_at: new Date().toISOString(),
+        duration_sec: duration,
+        exercises_done: done
+      });
+      loadHistory();
+      resetTimer();
+    } catch (err) {
+      console.error('Ошибка завершения:', err);
+    }
+  };
+
+  const exportHistory = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/export-history`, { // ИСПРАВИЛ АДРЕС
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'history.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Ошибка экспорта:', err);
+    }
+  };
+
+  const installPWA = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          setIsPWA(false);
+        }
+        setDeferredPrompt(null);
+      });
+    }
+  };
+
+  /* - расчёты для круга - */
   const percentage = totalSeconds ? Math.round((secondsLeft / totalSeconds) * 100) : 0;
 
+  /* - рендер - */
   return (
     <div className="app-dark">
       <h1>Моя тренировка</h1>
 
-      <ImportProgram onImported={() => window.location.reload()} />
-
-      <button
-        onClick={() => {
-          const template = {
-            title: 'Моя программа',
-            exercises: [
-              {
-                id: 1,
-                name: 'Упражнение 1',
-                tip: 'Краткий совет по технике',
-                yt_search: 'название упражнения shorts',
-                sets: 3,
-                reps: 10,
-                weight: 0
-              }
-            ]
-          };
-          const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'template_workout.json';
-          a.click();
-          URL.revokeObjectURL(url);
-        }}
-        style={{ marginBottom: '1rem' }}
-      >
-        Скачать шаблон JSON
-      </button>
-
-      {programs.length > 0 && (
-        <div style={{ marginBottom: '1rem' }}>
-          <b>Выбрать программу:</b>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {programs.map(p => (
-              <li key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 4 }}>
-                <button
-                  onClick={() => loadProgramExercises(p.id)}
-                  style={{ flex: 1, textAlign: 'left' }}
-                >
-                  {p.title} ({p.ex_count})
-                </button>
-                <button
-                  onClick={async () => {
-                    const full = await axios.get<WorkoutProgram>(`http://127.0.0.1:8000/programs/${p.id}`);
-                    setEditingProg(full.data);
-                  }}
-                >
-                  ✏️
-                </button>
-                <button onClick={() => deleteProgram(p.id)}>🗑️</button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* ---------- выбор звука таймера ---------- */}
-      <label style={{ marginBottom: '1rem', display: 'block' }}>
-        Звук таймера:
-        <select value={soundFile} onChange={e => setSoundFile(e.target.value)} style={{ marginLeft: 8 }}>
-          <option value="beep.wav">Бип</option>
-          <option value="gong.wav">Гонг</option>
-          <option value="voice.wav">Голос «отдых окончен»</option>
-        </select>
-      </label>
-
+      {/* Импорт программ */}
+      <ImportProgram onImported={() => {
+        loadPrograms();
+        loadExercises();
+      }} />
       <hr style={{ margin: '1rem 0' }} />
 
-      <ul className="ex-list">
-        {exercises.map(ex => (
-          <li key={ex.id} className="ex-card">
-            <strong>{ex.name}</strong>
-            <p>
-              {ex.sets} подходов × {ex.reps} повторений {ex.weight ? `× ${ex.weight} кг` : ''}
-            </p>
-            <p>{ex.tip ?? 'Совет скоро появится'}</p>
-            <a href={`https://www.youtube.com/results?search_query=${ex.yt_search}`} target="_blank" rel="noreferrer">
-              Смотреть shorts
-            </a>
-          </li>
-        ))}
-      </ul>
-
-      <hr style={{ margin: '2rem 0' }} />
-      <h2>Отдых</h2>
-
-      <div style={{ width: 150, margin: '0 auto 1rem' }}>
-        <CircularProgressbar
-          value={percentage}
-          text={`${secondsLeft}s`}
-          styles={buildStyles({
-            textSize: '22px',
-            pathColor: '#90caf9',
-            textColor: '#fff',
-            trailColor: '#333',
-          })}
-        />
-      </div>
-
-      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-        <button onClick={() => startTimer(60)}>60 с</button>
-        <button onClick={() => startTimer(90)}>90 с</button>
-        <button onClick={() => startTimer(120)}>120 с</button>
-        <button onClick={() => startTimer(180)}>180 с</button>
-      </div>
-
-      <button
-        onClick={finishWorkout}
-        style={{ marginTop: '2rem', fontSize: '1.2rem', padding: '0.5rem 1rem' }}
-      >
-        Завершить тренировку
-      </button>
-
-      <hr style={{ margin: '2rem 0' }} />
-      <h2>История тренировок</h2>
-      <ul style={{ textAlign: 'left', maxWidth: 500, margin: '0 auto' }}>
-        {history.map(w => (
-          <li key={w.id}>
-            {new Date(w.finished_at).toLocaleString('ru-RU')} — {w.duration_sec} с, упражнений: {w.exercises_done.length}
-          </li>
-        ))}
-      </ul>
-
-      <button
-        onClick={async () => {
-          const res = await axios.get('https://fittracker-backend-ptcq.onrender.com', { responseType: 'blob' });
-          const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'workout_history.csv';
-          a.click();
-          URL.revokeObjectURL(url);
-        }}
-        style={{ marginTop: '1rem' }}
-      >
-        Скачать историю (CSV)
-      </button>
-
-      {/* ---------- PWA: кнопка «Установить» ---------- */}
-      {deferredPrompt && (
-        <button
-          onClick={async () => {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') console.log('Пользователь установил приложение');
-            setDeferredPrompt(null);
-          }}
-          style={{ marginBottom: '1rem' }}
-        >
+      {/* Кнопка установки PWA */}
+      {isPWA && (
+        <button onClick={installPWA} style={{ 
+          background: '#4CAF50', 
+          color: 'white', 
+          border: 'none', 
+          padding: '10px 20px', 
+          borderRadius: '4px',
+          marginBottom: '1rem'
+        }}>
           📲 Установить приложение
         </button>
       )}
 
-      {/* ---------- модальное окно редактирования ---------- */}
+      {/* Таймер */}
+      <div style={{ width: 150, height: 150, margin: '0 auto 1rem' }}>
+        <CircularProgressbar 
+          value={percentage} 
+          text={`${secondsLeft}s`}
+          styles={buildStyles({
+            textSize: '16px',
+            pathColor: `rgba(62, 152, 199, ${isActive ? 1 : 0.5})`,
+            textColor: '#fff',
+            trailColor: '#222',
+          })}
+        />
+      </div>
+
+      {/* Управление таймером */}
+      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button onClick={() => startTimer(60)}>60s</button>
+        <button onClick={() => startTimer(90)}>90s</button>
+        <button onClick={() => startTimer(120)}>120s</button>
+        <button onClick={() => startTimer(180)}>180s</button>
+        <button onClick={resetTimer} style={{ background: '#f44336' }}>Стоп</button>
+        <button onClick={finishWorkout} style={{ background: '#4CAF50' }}>🏁 Завершить</button>
+      </div>
+
+      {/* Выбор звука */}
+      <label style={{ marginBottom: '1rem', display: 'block' }}>
+        Звук таймера:
+        <select 
+          value={soundFile} 
+          onChange={e => setSoundFile(e.target.value)}
+          style={{ marginLeft: '0.5rem' }}
+        >
+          <option value="beep.wav">Бип</option>
+          <option value="gong.wav">Гонг</option>
+          <option value="voice.wav">Голос</option>
+        </select>
+      </label>
+
+      {/* Список упражнений */}
+      <h2>Упражнения</h2>
+      <ul style={{ padding: 0 }}>
+        {exercises.map(ex => (
+          <li key={ex.id} style={{ 
+            listStyle: 'none', 
+            background: '#333', 
+            margin: '0.5rem 0', 
+            padding: '1rem', 
+            borderRadius: '4px' 
+          }}>
+            <h3>{ex.name}</h3>
+            {ex.tip && <p>💡 {ex.tip}</p>}
+            <p>{ex.sets} подходов × {ex.reps} повторений {ex.weight ? `× ${ex.weight} кг` : ''}</p>
+            {ex.yt_search && (
+              <a 
+                href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.yt_search)}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ color: '#4CAF50' }}
+              >
+                🎥 Посмотреть технику
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {/* Список программ */}
+      <h2>Программы тренировок</h2>
+      <ul style={{ padding: 0 }}>
+        {programs.map(p => (
+          <li key={p.id} style={{ 
+            listStyle: 'none', 
+            background: '#333', 
+            margin: '0.5rem 0', 
+            padding: '1rem', 
+            borderRadius: '4px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>{p.title} ({p.ex_count})</span>
+            <div>
+              <button onClick={async () => {
+                try {
+                  const full = await axios.get<WorkoutProgram>(`${API_URL}/programs/${p.id}`); // ИСПРАВИЛ АДРЕС
+                  setEditingProg(full.data);
+                } catch (err) {
+                  console.error('Ошибка загрузки программы:', err);
+                }
+              }}>✏️</button>
+              <button onClick={() => deleteProgram(p.id)}>🗑️</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* История тренировок */}
+      <h2>История тренировок</h2>
+      <button onClick={exportHistory} style={{ marginBottom: '1rem' }}>📥 Экспорт в CSV</button>
+      <ul style={{ padding: 0 }}>
+        {history.map(w => (
+          <li key={w.id} style={{ 
+            listStyle: 'none', 
+            background: '#333', 
+            margin: '0.5rem 0', 
+            padding: '1rem', 
+            borderRadius: '4px' 
+          }}>
+            <p>🏁 Завершено: {new Date(w.finished_at).toLocaleString()}</p>
+            <p>⏱️ Длительность: {w.duration_sec} сек</p>
+            <p>💪 Упражнения: {w.exercises_done.join(', ')}</p>
+          </li>
+        ))}
+      </ul>
+
+      {/* Модальное окно редактирования */}
       {editingProg && (
-        <dialog open style={{ padding: '1rem', width: 400 }}>
-          <h3>Редактировать программу</h3>
+        <dialog open style={{ 
+          position: 'fixed', 
+          top: '50%', 
+          left: '50%', 
+          transform: 'translate(-50%, -50%)',
+          background: '#222',
+          color: 'white',
+          padding: '1rem',
+          border: '1px solid #444',
+          borderRadius: '4px',
+          maxWidth: '90vw',
+          width: '400px'
+        }}>
+          <h2>Редактировать программу</h2>
           <label>
             Название:
-            <input
+            <input 
+              type="text" 
               value={editingProg.title}
               onChange={e => setEditingProg({ ...editingProg, title: e.target.value })}
-              style={{ width: '100%' }}
+              style={{ width: '100%', margin: '0.5rem 0' }}
             />
           </label>
           <br />
@@ -331,15 +377,17 @@ function App() {
                 try {
                   const arr = JSON.parse(e.target.value);
                   setEditingProg({ ...editingProg, exercises: arr });
-                } catch {}
+                } catch {
+                  // Игнорируем ошибки парсинга
+                }
               }}
               rows={6}
-              style={{ width: '100%' }}
+              style={{ width: '100%', margin: '0.5rem 0' }}
             />
           </label>
           <br />
-          <button onClick={saveEdit}>Сохранить</button>
-          <button onClick={() => setEditingProg(null)}>Отмена</button>
+          <button onClick={saveEdit} style={{ background: '#4CAF50', color: 'white' }}>Сохранить</button>
+          <button onClick={() => setEditingProg(null)} style={{ background: '#f44336', color: 'white', marginLeft: '0.5rem' }}>Отмена</button>
         </dialog>
       )}
     </div>
